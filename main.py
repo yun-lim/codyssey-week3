@@ -105,7 +105,23 @@ def classify_scores(score_a: float, score_b: float) -> str:
     return "X"
 
 
-def benchmark_size(size: int) -> Tuple[float, int]:
+def flatten_matrix(matrix: Matrix) -> List[float]:
+    flat: List[float] = []
+    for row in matrix:
+        flat.extend(row)
+    return flat
+
+
+def mac_1d(pattern: List[float], kernel: List[float]) -> float:
+    if len(pattern) != len(kernel):
+        raise ValueError("1차원 배열 길이가 일치하지 않습니다.")
+    total = 0.0
+    for idx in range(len(pattern)):
+        total += pattern[idx] * kernel[idx]
+    return total
+
+
+def benchmark_size(size: int) -> Tuple[float, float, int]:
     pattern = generate_pattern(size, "cross")
     filter_cross = generate_filter(size, "cross")
     filter_x = generate_filter(size, "x")
@@ -114,8 +130,18 @@ def benchmark_size(size: int) -> Tuple[float, int]:
     for _ in range(BENCHMARK_REPETITIONS):
         mac(pattern, filter_cross)
         mac(pattern, filter_x)
-    elapsed_ms = (time.perf_counter() - start) * 1000.0 / BENCHMARK_REPETITIONS
-    return elapsed_ms, size * size
+    elapsed_2d_ms = (time.perf_counter() - start) * 1000.0 / BENCHMARK_REPETITIONS
+
+    flat_pattern = flatten_matrix(pattern)
+    flat_cross = flatten_matrix(filter_cross)
+    flat_x = flatten_matrix(filter_x)
+    start = time.perf_counter()
+    for _ in range(BENCHMARK_REPETITIONS):
+        mac_1d(flat_pattern, flat_cross)
+        mac_1d(flat_pattern, flat_x)
+    elapsed_1d_ms = (time.perf_counter() - start) * 1000.0 / BENCHMARK_REPETITIONS
+
+    return elapsed_2d_ms, elapsed_1d_ms, size * size
 
 
 def benchmark_pair(pattern: Matrix, filter_a: Matrix, filter_b: Matrix, repeats: int = BENCHMARK_REPETITIONS) -> float:
@@ -148,11 +174,43 @@ def print_perf_table(sizes: List[int]) -> None:
     print("\n" + "=" * 52)
     print("성능 분석")
     print("=" * 52)
-    print(f"{ '크기':>10} | {'평균(ms)':>12} | {'연산 횟수(N^2)':>16}")
-    print("-" * 52)
+    print(f"{ '크기':>10} | {'2D 평균(ms)':>12} | {'1D 평균(ms)':>12} | {'연산 횟수(N^2)':>16}")
+    print("-" * 68)
     for size in sizes:
-        avg_ms, operations = benchmark_size(size)
-        print(f"{size:>5}x{size:<5} | {avg_ms:>10.6f} | {operations:>16d}")
+        avg_2d_ms, avg_1d_ms, operations = benchmark_size(size)
+        print(
+            f"{size:>5}x{size:<5} | {avg_2d_ms:>10.6f} | {avg_1d_ms:>10.6f} | {operations:>16d}"
+        )
+
+
+def print_matrix(matrix: Matrix) -> None:
+    for row in matrix:
+        print(" ".join(f"{int(v) if v.is_integer() else v}" for v in row))
+
+
+def run_pattern_generator() -> None:
+    print("\n[패턴 생성기]")
+    while True:
+        raw = input("패턴 크기 입력(예: 3, 5, 13, 25) 또는 q 종료: ").strip().lower()
+        if raw == "q":
+            return
+        try:
+            size = int(raw)
+            if size <= 0:
+                print("양의 정수만 입력 가능합니다.")
+                continue
+        except ValueError:
+            print("양의 정수 또는 q만 입력하세요.")
+            continue
+
+        cross_pattern = generate_pattern(size, "cross")
+        x_pattern = generate_pattern(size, "x")
+
+        print(f"\nCross ({size}x{size})")
+        print_matrix(cross_pattern)
+        print(f"\nX ({size}x{size})")
+        print_matrix(x_pattern)
+        print(f"1차원 변환 길이: {size * size}")
 
 
 def parse_size_from_key(key: str) -> Optional[int]:
@@ -370,14 +428,17 @@ def main() -> None:
     print("\n[모드 선택]")
     print("1. 사용자 입력 (3x3)")
     print("2. data.json 분석")
+    print("3. 패턴 생성기")
 
     choice = input("선택: ").strip()
     if choice == "1":
         run_mode1()
     elif choice == "2":
         run_mode2()
+    elif choice == "3":
+        run_pattern_generator()
     else:
-        print("1 또는 2를 입력해 주세요.")
+        print("1, 2, 3 중 하나를 입력해 주세요.")
 
 
 if __name__ == "__main__":
