@@ -233,7 +233,12 @@ def run_mode1() -> None:
 
     score_a = mac(pattern, filter_a)
     score_b = mac(pattern, filter_b)
-    result = "A" if score_a > score_b + EPSILON else ("B" if score_b > score_a + EPSILON else "UNDECIDED")
+    if abs(score_a - score_b) < EPSILON:
+        result = "판정 불가"
+    elif score_a > score_b:
+        result = "A"
+    else:
+        result = "B"
 
     print("\n" + "=" * 52)
     print("[3] MAC 결과")
